@@ -269,7 +269,7 @@
   </header>
 
   <div class="notice">
-    ✓ JMdict（EDRDG, <a href="https://creativecommons.org/licenses/by-sa/4.0/" style="color:var(--gold);">CC BY-SA 4.0</a>）の常用語データ <strong id="wordCountLabel"></strong> を読み込んでいます。データ出典: <a href="https://www.edrdg.org/wiki/index.php/JMdict-EDICT_Dictionary_Project" style="color:var(--gold);">EDRDG JMdict-EDICT Dictionary Project</a>（公式ライセンスページ: <a href="https://www.edrdg.org/edrdg/licence.html" style="color:var(--gold);">edrdg.org/edrdg/licence.html</a>）／JSON変換: <a href="https://github.com/scriptin/jmdict-simplified" style="color:var(--gold);">jmdict-simplified</a>。
+    ✓ JMdict（EDRDG, <a href="https://creativecommons.org/licenses/by-sa/4.0/" style="color:var(--gold);">CC BY-SA 4.0</a>）の常用語データ <strong id="wordCountLabel"></strong> を読み込んでいます。データ出典: <a href="https://www.edrdg.org/wiki/index.php/JMdict-EDICT_Dictionary_Project" style="color:var(--gold);">EDRDG JMdict-EDICT Dictionary Project</a>（公式ライセンスページ: <a href="https://www.edrdg.org/edrdg/licence.html" style="color:var(--gold);">edrdg.org/edrdg/licence.html</a>）／JSON変換: <a href="https://github.com/scriptin/jmdict-simplified" style="color:var(--gold);">jmdict-simplified</a>。同梱の <code>update_jmdict_data.py</code> を定期実行すると最新版に更新できます。<span id="dataSourceLabel"></span>
   </div>
 
   <section class="builder">
@@ -317,27 +317,33 @@ function normalize(raw){
 async function loadData(){
   const sourceLabel = document.getElementById("dataSourceLabel");
   const countLabel = document.getElementById("wordCountLabel");
-  countLabel.textContent = "読み込み中…";
+  const setSource = (text) => { if(sourceLabel) sourceLabel.textContent = text; };
+  const setCount = (text) => { if(countLabel) countLabel.textContent = text; };
 
-  if(REMOTE_DATA_URL){
-    try{
-      sourceLabel.textContent = "オンラインの最新データを取得中…";
-      const res = await fetch(REMOTE_DATA_URL, { cache: "no-store" });
-      if(!res.ok) throw new Error("HTTP " + res.status);
-      const json = await res.json();
-      DATA = normalize(json);
-      sourceLabel.textContent = "オンラインデータ（取得日時: " + new Date().toLocaleString("ja-JP") + "）を使用中。";
-    }catch(err){
-      console.warn("リモートデータの取得に失敗、同梱データを使用します:", err);
+  setCount("読み込み中…");
+
+  try{
+    if(REMOTE_DATA_URL){
+      try{
+        setSource("オンラインの最新データを取得中…");
+        const res = await fetch(REMOTE_DATA_URL, { cache: "no-store" });
+        if(!res.ok) throw new Error("HTTP " + res.status);
+        const json = await res.json();
+        DATA = normalize(json);
+        setSource("オンラインデータ（取得日時: " + new Date().toLocaleString("ja-JP") + "）を使用中。");
+      }catch(err){
+        console.warn("リモートデータの取得に失敗、同梱データを使用します:", err);
+        DATA = normalize(JMDICT_DATA);
+        setSource("オンライン取得に失敗したため、同梱データ（ビルド時点）を使用中。");
+      }
+    } else {
       DATA = normalize(JMDICT_DATA);
-      sourceLabel.textContent = "オンライン取得に失敗したため、同梱データ（ビルド時点）を使用中。";
+      setSource("同梱データ（ビルド時点の常用語スナップショット）を使用中。定期的な更新については後述の更新スクリプトを利用してください。");
     }
-  } else {
-    DATA = normalize(JMDICT_DATA);
-    sourceLabel.textContent = "同梱データ（ビルド時点の常用語スナップショット）を使用中。定期的な更新については後述の更新スクリプトを利用してください。";
+  } finally {
+    // sourceLabel の有無に関わらず、必ず単語数の表示を更新する
+    setCount(DATA.length + " 語");
   }
-
-  countLabel.textContent = DATA.length + " 語";
 }
 
 function addCondition(){
