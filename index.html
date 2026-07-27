@@ -553,6 +553,9 @@ function highlightReading(entry){
 
 const MAX_DISPLAY_RESULTS = 200;
 
+// 読み(かな)を五十音順に並べるためのコレーター(単純なUnicode順だと濁音・拗音などの並びがずれるため)
+const kanaCollator = new Intl.Collator("ja", { usage: "sort", sensitivity: "variant" });
+
 function runSearch(){
   const active = conditions.filter(c => c.type === "pos" ? c.value : (c.value !== "" && c.value !== null));
   let results;
@@ -563,6 +566,8 @@ function runSearch(){
   } else {
     results = DATA.filter(e => active.some(c => conditionMatches(e, c)));
   }
+
+  results = results.slice().sort((a, b) => kanaCollator.compare(a.reading, b.reading));
 
   const countLabel = document.getElementById("resultCount");
   const list = document.getElementById("resultList");
