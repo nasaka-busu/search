@@ -365,6 +365,16 @@ function updateCondition(id, patch){
   runSearch();
 }
 
+// テキスト・数値の入力欄用: DOM(入力欄そのもの)を作り直さずに値だけ更新する。
+// renderConditions()を呼ぶとinput要素が再生成されてフォーカスが外れ、
+// IME変換中の文字が確定されてしまう(「き」が「ｋ」で止まる)ため、ここでは呼ばない。
+let searchDebounceTimer = null;
+function updateConditionValue(condition, patch){
+  Object.assign(condition, patch);
+  clearTimeout(searchDebounceTimer);
+  searchDebounceTimer = setTimeout(runSearch, 80);
+}
+
 function renderConditions(){
   const wrap = document.getElementById("conditions");
   wrap.innerHTML = "";
@@ -413,7 +423,7 @@ function renderConditions(){
         charInput.placeholder = "例: あ";
         charInput.value = c.value;
         charInput.style.width = "80px";
-        charInput.oninput = e => updateCondition(c.id, { value: e.target.value });
+        charInput.oninput = e => updateConditionValue(c, { value: e.target.value });
         row.appendChild(charInput);
 
         const opSel = document.createElement("select");
@@ -431,7 +441,7 @@ function renderConditions(){
         countInput.min = "1";
         countInput.value = c.count;
         countInput.style.width = "70px";
-        countInput.oninput = e => updateCondition(c.id, { count: e.target.value });
+        countInput.oninput = e => updateConditionValue(c, { count: e.target.value });
         row.appendChild(countInput);
 
         const unit = document.createElement("span");
@@ -450,7 +460,7 @@ function renderConditions(){
           input.placeholder = "例: あ";
         }
         input.value = c.value;
-        input.oninput = e => updateCondition(c.id, { value: e.target.value });
+        input.oninput = e => updateConditionValue(c, { value: e.target.value });
         row.appendChild(input);
       }
     } else {
