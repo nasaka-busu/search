@@ -414,7 +414,22 @@ function renderConditions(){
         if(c.matchType === v) opt.selected = true;
         matchSel.appendChild(opt);
       });
-      matchSel.onchange = e => updateCondition(c.id, { matchType: e.target.value, value: "", count: 2, operator: "eq" });
+      matchSel.onchange = e => {
+        const newType = e.target.value;
+        const textTypes = ["starts", "ends", "contains"];
+        const patch = { matchType: newType };
+        if(textTypes.includes(newType) && textTypes.includes(c.matchType)){
+          // 前方一致・後方一致・部分一致はどれも同じ「文字列」を扱うため、値を保持する
+        } else if(newType === "count"){
+          patch.value = "";
+          patch.count = 2;
+          patch.operator = "eq";
+        } else {
+          // 文字数(length)への切替、またはlength/countからの切替は値の意味が変わるためリセット
+          patch.value = "";
+        }
+        updateCondition(c.id, patch);
+      };
       row.appendChild(matchSel);
 
       if(c.matchType === "count"){
@@ -536,6 +551,8 @@ function highlightReading(entry){
   return entry.reading;
 }
 
+const MAX_DISPLAY_RESULTS = 200;
+
 function runSearch(){
   const active = conditions.filter(c => c.type === "pos" ? c.value : (c.value !== "" && c.value !== null));
   let results;
@@ -547,11 +564,12 @@ function runSearch(){
     results = DATA.filter(e => active.some(c => conditionMatches(e, c)));
   }
 
-  document.getElementById("resultCount").textContent = results.length + " 件";
+  const countLabel = document.getElementById("resultCount");
   const list = document.getElementById("resultList");
   list.innerHTML = "";
 
   if(results.length === 0){
+    countLabel.textContent = "0 件";
     const empty = document.createElement("div");
     empty.className = "empty-state";
     empty.textContent = "条件に一致する語彙が見つかりませんでした。条件を見直してください。";
@@ -559,7 +577,13 @@ function runSearch(){
     return;
   }
 
-  results.forEach(e => {
+  const isTruncated = results.length > MAX_DISPLAY_RESULTS;
+  countLabel.textContent = results.length + " 件" + (isTruncated ? `（先頭${MAX_DISPLAY_RESULTS}件を表示中）` : "");
+
+  // 大量のDOM操作を一度にまとめて反映するため、DocumentFragmentに積んでから1回でappendする
+  const frag = document.createDocumentFragment();
+  const toRender = isTruncated ? results.slice(0, MAX_DISPLAY_RESULTS) : results;
+  toRender.forEach(e => {
     const card = document.createElement("div");
     card.className = "entry";
     card.innerHTML = `
@@ -568,8 +592,16 @@ function runSearch(){
       <span class="pos">${e.pos}</span>
       <span class="meanings">${e.meanings.join(" / ")}</span>
     `;
-    list.appendChild(card);
+    frag.appendChild(card);
   });
+  list.appendChild(frag);
+
+  if(isTruncated){
+    const note = document.createElement("div");
+    note.className = "empty-state";
+    note.textContent = `他に ${results.length - MAX_DISPLAY_RESULTS} 件あります。条件を追加すると絞り込めます。`;
+    list.appendChild(note);
+  }
 }
 
 document.getElementById("addCondition").addEventListener("click", addCondition);
