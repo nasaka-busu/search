@@ -617,8 +617,7 @@ document.querySelectorAll(".mode-btn").forEach(btn => {
 
 (async function init(){
   await loadData();
-  // 初期状態: 1件の条件（読み・出現回数・「あ」が2回）
-  conditions.push({ id: idCounter++, type: "reading", matchType: "count", value: "あ", count: 2, operator: "eq" });
+  // 初期状態は条件なし(全件表示、上限200件まで)からスタートする
   renderConditions();
   runSearch();
 })();
