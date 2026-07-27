@@ -1,0 +1,40 @@
+name: Update JMdict data
+
+# JMdict/EDICTのライセンス(CC BY-SA 4.0)では、辞書データを使うWebサーバーは
+# 定期的(目安: 月1回以上)に最新版へ更新することが求められています。
+# ここではJMdictのリリース頻度(週1回)に合わせて毎週自動更新します。
+
+on:
+  schedule:
+    - cron: "0 18 * * 0"  # 毎週日曜 18:00 UTC (= 日本時間 月曜 3:00頃)
+  workflow_dispatch: {}   # Actionsタブから手動実行も可能
+
+permissions:
+  contents: write
+
+jobs:
+  update-data:
+    runs-on: ubuntu-latest
+    steps:
+      - name: リポジトリをチェックアウト
+        uses: actions/checkout@v4
+
+      - name: Python セットアップ
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: JMdictデータを更新
+        run: python3 update_jmdict_data.py
+
+      - name: 変更があればコミット & プッシュ
+        run: |
+          git config user.name "jmdict-update-bot"
+          git config user.email "actions@users.noreply.github.com"
+          if git diff --quiet -- jmdict_data.js; then
+            echo "変更なし。更新をスキップします。"
+          else
+            git add jmdict_data.js
+            git commit -m "chore: update JMdict data ($(date -u +%Y-%m-%d))"
+            git push
+          fi

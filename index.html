@@ -1,0 +1,579 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>字引 — JMdict検索デモ</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@500;700;800&family=Noto+Sans+JP:wght@400;500;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg: #16233A;
+    --bg-deep: #101C2E;
+    --surface: #1E3049;
+    --surface-alt: #243c5a;
+    --ink: #F3EFE2;
+    --ink-dim: #A9B4C6;
+    --accent: #C3432B;
+    --accent-soft: rgba(195,67,43,0.18);
+    --gold: #D7A94C;
+    --line: rgba(243,239,226,0.14);
+    --radius: 10px;
+  }
+  *{ box-sizing:border-box; }
+  html,body{ margin:0; padding:0; }
+  body{
+    background: var(--bg);
+    background-image:
+      radial-gradient(circle at 15% 0%, rgba(215,169,76,0.07), transparent 40%),
+      radial-gradient(circle at 85% 20%, rgba(195,67,43,0.08), transparent 45%);
+    color: var(--ink);
+    font-family: "Noto Sans JP", sans-serif;
+    line-height: 1.6;
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+  }
+  .app{ max-width: 880px; margin: 0 auto; padding: 48px 24px 96px; }
+
+  /* ---------- Header ---------- */
+  .hero{ display:flex; gap:20px; align-items:flex-start; margin-bottom: 28px; }
+  .hero-mark{
+    flex: 0 0 auto;
+    width: 64px; height:64px;
+    border-radius: 50%;
+    background: var(--accent);
+    color: #fff;
+    font-family: "Shippori Mincho", serif;
+    font-weight: 800;
+    font-size: 28px;
+    display:flex; align-items:center; justify-content:center;
+    box-shadow: 0 0 0 3px var(--bg-deep), 0 0 0 4px var(--accent-soft);
+  }
+  .eyebrow{
+    font-family: "JetBrains Mono", monospace;
+    font-size: 11px;
+    letter-spacing: 0.16em;
+    color: var(--gold);
+    margin: 4px 0 6px;
+    text-transform: uppercase;
+  }
+  .hero h1{
+    font-family: "Shippori Mincho", serif;
+    font-size: 40px;
+    font-weight: 800;
+    margin: 0 0 6px;
+    letter-spacing: 0.04em;
+  }
+  .hero h1 span{
+    font-size: 16px;
+    font-weight: 500;
+    color: var(--ink-dim);
+    margin-left: 10px;
+  }
+  .lead{ color: var(--ink-dim); font-size: 14.5px; max-width: 56ch; margin: 0; }
+
+  .notice{
+    background: var(--surface);
+    border: 1px dashed var(--line);
+    border-radius: var(--radius);
+    padding: 12px 16px;
+    font-size: 13px;
+    color: var(--ink-dim);
+    margin-bottom: 36px;
+  }
+  .notice strong{ color: var(--gold); }
+
+  section.builder, section.results{ margin-bottom: 40px; }
+
+  .builder-head, .results-head{
+    display:flex; align-items:center; justify-content: space-between;
+    flex-wrap: wrap; gap: 10px;
+    margin-bottom: 16px;
+  }
+  h2{
+    font-family: "Shippori Mincho", serif;
+    font-size: 20px;
+    font-weight: 700;
+    margin: 0;
+    display:flex; align-items:center; gap:8px;
+  }
+  h2::before{
+    content:"";
+    width: 4px; height: 18px;
+    background: var(--accent);
+    display:inline-block;
+    border-radius: 2px;
+  }
+
+  .mode-toggle{ display:flex; gap:8px; }
+  .mode-btn{
+    font-family: "JetBrains Mono", monospace;
+    font-size: 11.5px;
+    letter-spacing: 0.02em;
+    padding: 7px 12px;
+    border-radius: 999px;
+    border: 1px solid var(--line);
+    background: transparent;
+    color: var(--ink-dim);
+    cursor: pointer;
+    transition: all .15s ease;
+  }
+  .mode-btn.active{
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+  }
+  .mode-btn:hover:not(.active){ border-color: var(--gold); color: var(--gold); }
+
+  /* ---------- Condition cards (tanzaku strips) ---------- */
+  .conditions{ display:flex; flex-direction:column; gap: 14px; }
+  .condition{
+    position: relative;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-left: 3px solid var(--gold);
+    border-radius: var(--radius);
+    padding: 16px 18px 16px 22px;
+    display:flex; flex-wrap: wrap; align-items:center; gap: 10px;
+  }
+  .condition::before{
+    content: attr(data-index);
+    position:absolute;
+    top: -9px; left: 16px;
+    font-family: "JetBrains Mono", monospace;
+    font-size: 10.5px;
+    background: var(--bg-deep);
+    color: var(--gold);
+    padding: 1px 8px;
+    border-radius: 999px;
+    border: 1px solid var(--line);
+  }
+  .and-divider{
+    text-align:center;
+    font-family: "JetBrains Mono", monospace;
+    font-size: 11px;
+    color: var(--ink-dim);
+    letter-spacing: 0.1em;
+  }
+  select, input[type="text"], input[type="number"]{
+    font-family: "Noto Sans JP", sans-serif;
+    font-size: 13.5px;
+    background: var(--bg-deep);
+    color: var(--ink);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 8px 10px;
+    outline: none;
+  }
+  select:focus, input:focus{ border-color: var(--gold); }
+  input[type="text"], input[type="number"]{ width: 140px; }
+  .remove-btn{
+    margin-left: auto;
+    background: transparent;
+    border: none;
+    color: var(--ink-dim);
+    font-size: 18px;
+    line-height: 1;
+    cursor: pointer;
+    padding: 4px 8px;
+    border-radius: 6px;
+  }
+  .remove-btn:hover{ color: var(--accent); background: var(--accent-soft); }
+
+  .add-btn{
+    margin-top: 16px;
+    font-family: "JetBrains Mono", monospace;
+    font-size: 12.5px;
+    background: transparent;
+    border: 1px dashed var(--line);
+    color: var(--ink-dim);
+    padding: 10px 16px;
+    border-radius: var(--radius);
+    cursor: pointer;
+    width: 100%;
+    transition: all .15s ease;
+  }
+  .add-btn:hover{ border-color: var(--gold); color: var(--gold); }
+
+  /* ---------- Results ---------- */
+  .count-badge{
+    font-family: "JetBrains Mono", monospace;
+    font-size: 12px;
+    color: var(--bg-deep);
+    background: var(--gold);
+    padding: 4px 10px;
+    border-radius: 999px;
+    font-weight: 600;
+  }
+  .result-list{ display:flex; flex-direction:column; gap: 10px; }
+  .entry{
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 14px 18px;
+    display:flex; align-items:baseline; gap: 16px; flex-wrap: wrap;
+  }
+  .entry .kanji{
+    font-family: "Shippori Mincho", serif;
+    font-size: 22px;
+    font-weight: 700;
+    min-width: 64px;
+  }
+  .entry .reading{ color: var(--gold); font-size: 14px; min-width: 90px; }
+  .entry .reading mark{
+    background: transparent;
+    color: var(--accent);
+    font-weight: 700;
+    text-decoration: underline;
+    text-decoration-color: var(--accent);
+  }
+  .entry .pos{
+    font-family: "JetBrains Mono", monospace;
+    font-size: 10.5px;
+    padding: 3px 9px;
+    border-radius: 999px;
+    border: 1px solid var(--line);
+    color: var(--ink-dim);
+    white-space: nowrap;
+  }
+  .entry .meanings{ color: var(--ink-dim); font-size: 13.5px; flex: 1 1 240px; }
+  .empty-state{
+    text-align:center;
+    padding: 40px 20px;
+    color: var(--ink-dim);
+    font-size: 13.5px;
+    border: 1px dashed var(--line);
+    border-radius: var(--radius);
+  }
+
+  @media (max-width: 560px){
+    .hero{ flex-direction: column; }
+    .hero h1{ font-size: 32px; }
+    input[type="text"], input[type="number"]{ width: 100%; }
+    .condition{ flex-direction: column; align-items: stretch; }
+    .remove-btn{ margin-left: 0; align-self: flex-end; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <header class="hero">
+    <div class="hero-mark">辞</div>
+    <div>
+      <p class="eyebrow">JMdict Search</p>
+      <h1>字引 <span>じびき</span></h1>
+      <p class="lead">条件を組み合わせてJMdictの語彙を検索します。「読み」や「品詞」の条件を追加して、AND / OR で絞り込めます。</p>
+    </div>
+  </header>
+
+  <div class="notice">
+    ✓ JMdict（EDRDG, <a href="https://creativecommons.org/licenses/by-sa/4.0/" style="color:var(--gold);">CC BY-SA 4.0</a>）の常用語データ <strong id="wordCountLabel"></strong> を読み込んでいます。データ出典: <a href="https://www.edrdg.org/wiki/index.php/JMdict-EDICT_Dictionary_Project" style="color:var(--gold);">EDRDG JMdict-EDICT Dictionary Project</a>（公式ライセンスページ: <a href="https://www.edrdg.org/edrdg/licence.html" style="color:var(--gold);">edrdg.org/edrdg/licence.html</a>）／JSON変換: <a href="https://github.com/scriptin/jmdict-simplified" style="color:var(--gold);">jmdict-simplified</a>。同梱の <code>update_jmdict_data.py</code> を定期実行すると最新版に更新できます。<span id="dataSourceLabel"></span>
+  </div>
+
+  <section class="builder">
+    <div class="builder-head">
+      <h2>検索条件</h2>
+      <div class="mode-toggle">
+        <button class="mode-btn active" data-mode="and">すべて満たす (AND)</button>
+        <button class="mode-btn" data-mode="or">いずれか満たす (OR)</button>
+      </div>
+    </div>
+    <div id="conditions" class="conditions"></div>
+    <button id="addCondition" class="add-btn">＋ 条件を追加</button>
+  </section>
+
+  <section class="results">
+    <div class="results-head">
+      <h2>検索結果</h2>
+      <span id="resultCount" class="count-badge">0 件</span>
+    </div>
+    <div id="resultList" class="result-list"></div>
+  </section>
+
+</div>
+
+<script src="jmdict_data.js"></script>
+<script>
+// ---------- JMdict実データの読み込み ----------
+// REMOTE_DATA_URL を設定すると、ページを開くたびにそのURLから最新データを取得しようとします。
+// 空のままなら常に同梱データ(jmdict_data.js / ビルド時点)を使います。
+// 設定する場合は、CORSヘッダー(Access-Control-Allow-Origin)を返せる場所にJSONを置く必要があります。
+// 例: 自分のGitHubリポジトリに変換済みJSONを置き、raw.githubusercontent.com のURLを指定する。
+const REMOTE_DATA_URL = ""; // 例: "https://raw.githubusercontent.com/<user>/<repo>/main/jmdict_compact.json"
+
+let DATA = [];
+const POS_LIST = ["名詞","動詞","形容詞","副詞","感動詞","助詞","接続詞","代名詞","接頭辞","接尾辞","表現・慣用句","その他"];
+
+let conditions = []; // {id, type: 'reading'|'pos', matchType, value}
+let idCounter = 0;
+let mode = "and";
+
+function normalize(raw){
+  return raw.map(e => ({ kanji: e.k, reading: e.r, pos: e.p, meanings: e.m }));
+}
+
+async function loadData(){
+  const sourceLabel = document.getElementById("dataSourceLabel");
+  const countLabel = document.getElementById("wordCountLabel");
+  countLabel.textContent = "読み込み中…";
+
+  if(REMOTE_DATA_URL){
+    try{
+      sourceLabel.textContent = "オンラインの最新データを取得中…";
+      const res = await fetch(REMOTE_DATA_URL, { cache: "no-store" });
+      if(!res.ok) throw new Error("HTTP " + res.status);
+      const json = await res.json();
+      DATA = normalize(json);
+      sourceLabel.textContent = "オンラインデータ（取得日時: " + new Date().toLocaleString("ja-JP") + "）を使用中。";
+    }catch(err){
+      console.warn("リモートデータの取得に失敗、同梱データを使用します:", err);
+      DATA = normalize(JMDICT_DATA);
+      sourceLabel.textContent = "オンライン取得に失敗したため、同梱データ（ビルド時点）を使用中。";
+    }
+  } else {
+    DATA = normalize(JMDICT_DATA);
+    sourceLabel.textContent = "同梱データ（ビルド時点の常用語スナップショット）を使用中。定期的な更新については後述の更新スクリプトを利用してください。";
+  }
+
+  countLabel.textContent = DATA.length + " 語";
+}
+
+function addCondition(){
+  conditions.push({ id: idCounter++, type: "reading", matchType: "starts", value: "", count: 2, operator: "eq" });
+  renderConditions();
+  runSearch();
+}
+
+function removeCondition(id){
+  conditions = conditions.filter(c => c.id !== id);
+  renderConditions();
+  runSearch();
+}
+
+function updateCondition(id, patch){
+  const c = conditions.find(c => c.id === id);
+  Object.assign(c, patch);
+  renderConditions();
+  runSearch();
+}
+
+function renderConditions(){
+  const wrap = document.getElementById("conditions");
+  wrap.innerHTML = "";
+  conditions.forEach((c, i) => {
+    if(i > 0){
+      const div = document.createElement("div");
+      div.className = "and-divider";
+      div.textContent = mode === "and" ? "－ かつ －" : "－ または －";
+      wrap.appendChild(div);
+    }
+    const row = document.createElement("div");
+    row.className = "condition";
+    row.dataset.index = "条件 " + (i + 1);
+
+    // 種類セレクト
+    const typeSel = document.createElement("select");
+    [["reading","読み(かな)"], ["pos","品詞"]].forEach(([v,l]) => {
+      const opt = document.createElement("option");
+      opt.value = v; opt.textContent = l;
+      if(c.type === v) opt.selected = true;
+      typeSel.appendChild(opt);
+    });
+    typeSel.onchange = e => updateCondition(c.id, {
+      type: e.target.value,
+      matchType: "starts",
+      value: e.target.value === "pos" ? POS_LIST[0] : "",
+      count: 2,
+      operator: "eq"
+    });
+    row.appendChild(typeSel);
+
+    if(c.type === "reading"){
+      const matchSel = document.createElement("select");
+      [["starts","前方一致"], ["ends","後方一致"], ["contains","部分一致"], ["length","文字数"], ["count","文字の出現回数"]].forEach(([v,l]) => {
+        const opt = document.createElement("option");
+        opt.value = v; opt.textContent = l;
+        if(c.matchType === v) opt.selected = true;
+        matchSel.appendChild(opt);
+      });
+      matchSel.onchange = e => updateCondition(c.id, { matchType: e.target.value, value: "", count: 2, operator: "eq" });
+      row.appendChild(matchSel);
+
+      if(c.matchType === "count"){
+        const charInput = document.createElement("input");
+        charInput.type = "text";
+        charInput.placeholder = "例: あ";
+        charInput.value = c.value;
+        charInput.style.width = "80px";
+        charInput.oninput = e => updateCondition(c.id, { value: e.target.value });
+        row.appendChild(charInput);
+
+        const opSel = document.createElement("select");
+        [["eq","ちょうど"], ["gte","以上"]].forEach(([v,l]) => {
+          const opt = document.createElement("option");
+          opt.value = v; opt.textContent = l;
+          if(c.operator === v) opt.selected = true;
+          opSel.appendChild(opt);
+        });
+        opSel.onchange = e => updateCondition(c.id, { operator: e.target.value });
+        row.appendChild(opSel);
+
+        const countInput = document.createElement("input");
+        countInput.type = "number";
+        countInput.min = "1";
+        countInput.value = c.count;
+        countInput.style.width = "70px";
+        countInput.oninput = e => updateCondition(c.id, { count: e.target.value });
+        row.appendChild(countInput);
+
+        const unit = document.createElement("span");
+        unit.style.color = "var(--ink-dim)";
+        unit.style.fontSize = "13px";
+        unit.textContent = "回";
+        row.appendChild(unit);
+      } else {
+        const input = document.createElement("input");
+        if(c.matchType === "length"){
+          input.type = "number";
+          input.min = "1";
+          input.placeholder = "例: 4";
+        } else {
+          input.type = "text";
+          input.placeholder = "例: あ";
+        }
+        input.value = c.value;
+        input.oninput = e => updateCondition(c.id, { value: e.target.value });
+        row.appendChild(input);
+      }
+    } else {
+      const posSel = document.createElement("select");
+      POS_LIST.forEach(p => {
+        const opt = document.createElement("option");
+        opt.value = p; opt.textContent = p;
+        if(c.value === p) opt.selected = true;
+        posSel.appendChild(opt);
+      });
+      posSel.onchange = e => updateCondition(c.id, { value: e.target.value });
+      if(!c.value) c.value = POS_LIST[0];
+      posSel.value = c.value;
+      row.appendChild(posSel);
+    }
+
+    const removeBtn = document.createElement("button");
+    removeBtn.className = "remove-btn";
+    removeBtn.textContent = "×";
+    removeBtn.onclick = () => removeCondition(c.id);
+    row.appendChild(removeBtn);
+
+    wrap.appendChild(row);
+  });
+}
+
+function conditionMatches(entry, c){
+  if(c.type === "reading"){
+    const v = (c.value || "").trim();
+    if(!v) return true;
+    const r = entry.reading;
+    if(c.matchType === "starts") return r.startsWith(v);
+    if(c.matchType === "ends") return r.endsWith(v);
+    if(c.matchType === "contains") return r.includes(v);
+    if(c.matchType === "length") return r.length === Number(v);
+    if(c.matchType === "count"){
+      const occ = countOccurrences(r, v);
+      return c.operator === "gte" ? occ >= Number(c.count) : occ === Number(c.count);
+    }
+  } else if(c.type === "pos"){
+    if(!c.value) return true;
+    return entry.pos === c.value;
+  }
+  return true;
+}
+
+function countOccurrences(str, sub){
+  if(!sub) return 0;
+  let count = 0, pos = 0;
+  while((pos = str.indexOf(sub, pos)) !== -1){
+    count++;
+    pos += sub.length;
+  }
+  return count;
+}
+
+function highlightReading(entry){
+  const readingConds = conditions.filter(c => c.type === "reading" && c.matchType !== "length" && c.value);
+  if(readingConds.length === 0) return entry.reading;
+  // 出現回数条件があれば、該当箇所を全てハイライト
+  const countCond = readingConds.find(c => c.matchType === "count" && entry.reading.includes(c.value));
+  if(countCond){
+    return entry.reading.split(countCond.value).join("<mark>" + countCond.value + "</mark>");
+  }
+  for(const c of readingConds){
+    const idx = entry.reading.indexOf(c.value);
+    if(idx !== -1){
+      return entry.reading.slice(0, idx)
+        + "<mark>" + entry.reading.slice(idx, idx + c.value.length) + "</mark>"
+        + entry.reading.slice(idx + c.value.length);
+    }
+  }
+  return entry.reading;
+}
+
+function runSearch(){
+  const active = conditions.filter(c => c.type === "pos" ? c.value : (c.value !== "" && c.value !== null));
+  let results;
+  if(active.length === 0){
+    results = DATA;
+  } else if(mode === "and"){
+    results = DATA.filter(e => active.every(c => conditionMatches(e, c)));
+  } else {
+    results = DATA.filter(e => active.some(c => conditionMatches(e, c)));
+  }
+
+  document.getElementById("resultCount").textContent = results.length + " 件";
+  const list = document.getElementById("resultList");
+  list.innerHTML = "";
+
+  if(results.length === 0){
+    const empty = document.createElement("div");
+    empty.className = "empty-state";
+    empty.textContent = "条件に一致する語彙が見つかりませんでした。条件を見直してください。";
+    list.appendChild(empty);
+    return;
+  }
+
+  results.forEach(e => {
+    const card = document.createElement("div");
+    card.className = "entry";
+    card.innerHTML = `
+      <span class="kanji">${e.kanji}</span>
+      <span class="reading">${highlightReading(e)}</span>
+      <span class="pos">${e.pos}</span>
+      <span class="meanings">${e.meanings.join(" / ")}</span>
+    `;
+    list.appendChild(card);
+  });
+}
+
+document.getElementById("addCondition").addEventListener("click", addCondition);
+
+document.querySelectorAll(".mode-btn").forEach(btn => {
+  btn.addEventListener("click", () => {
+    mode = btn.dataset.mode;
+    document.querySelectorAll(".mode-btn").forEach(b => b.classList.toggle("active", b === btn));
+    renderConditions();
+    runSearch();
+  });
+});
+
+(async function init(){
+  await loadData();
+  // 初期状態: 1件の条件（読み・出現回数・「あ」が2回）
+  conditions.push({ id: idCounter++, type: "reading", matchType: "count", value: "あ", count: 2, operator: "eq" });
+  renderConditions();
+  runSearch();
+})();
+</script>
+</body>
+</html>
