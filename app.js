@@ -234,23 +234,32 @@ function countOccurrences(str, sub){
   return count;
 }
 
+// innerHTMLに辞書データやユーザー入力由来の文字列を差し込む前に必ず通す
+// (entry.readingやc.valueに < 等が含まれていてもタグとして解釈されないようにする)
+function escapeHtml(str){
+  return String(str).replace(/[&<>"']/g, ch => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+  }[ch]));
+}
+
 function highlightReading(entry){
   const readingConds = conditions.filter(c => c.type === "reading" && c.matchType !== "length" && c.value);
-  if(readingConds.length === 0) return entry.reading;
+  const reading = entry.reading;
+  if(readingConds.length === 0) return escapeHtml(reading);
   // 出現回数条件があれば、該当箇所を全てハイライト
-  const countCond = readingConds.find(c => c.matchType === "count" && entry.reading.includes(c.value));
+  const countCond = readingConds.find(c => c.matchType === "count" && reading.includes(c.value));
   if(countCond){
-    return entry.reading.split(countCond.value).join("<mark>" + countCond.value + "</mark>");
+    return reading.split(countCond.value).map(escapeHtml).join("<mark>" + escapeHtml(countCond.value) + "</mark>");
   }
   for(const c of readingConds){
-    const idx = entry.reading.indexOf(c.value);
+    const idx = reading.indexOf(c.value);
     if(idx !== -1){
-      return entry.reading.slice(0, idx)
-        + "<mark>" + entry.reading.slice(idx, idx + c.value.length) + "</mark>"
-        + entry.reading.slice(idx + c.value.length);
+      return escapeHtml(reading.slice(0, idx))
+        + "<mark>" + escapeHtml(reading.slice(idx, idx + c.value.length)) + "</mark>"
+        + escapeHtml(reading.slice(idx + c.value.length));
     }
   }
-  return entry.reading;
+  return escapeHtml(reading);
 }
 
 const MAX_DISPLAY_RESULTS = 200;
@@ -294,10 +303,10 @@ function runSearch(){
     const card = document.createElement("div");
     card.className = "entry";
     card.innerHTML = `
-      <span class="kanji">${e.kanji}</span>
+      <span class="kanji">${escapeHtml(e.kanji)}</span>
       <span class="reading">${highlightReading(e)}</span>
-      <span class="pos">${e.pos}</span>
-      <span class="meanings">${e.meanings.join(" / ")}</span>
+      <span class="pos">${escapeHtml(e.pos)}</span>
+      <span class="meanings">${e.meanings.map(escapeHtml).join(" / ")}</span>
     `;
     frag.appendChild(card);
   });

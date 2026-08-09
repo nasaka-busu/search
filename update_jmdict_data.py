@@ -51,42 +51,43 @@ def download_and_extract(url):
             return json.load(f)
 
 
+REAL_VERB_TAG_PREFIXES = ("v1", "v5", "vk", "vz", "vs-i", "vs-s", "vs-c")
+
+
 def map_pos(tags):
     if not tags:
         return "その他"
-    for t in tags:
-        if t == "exp":
-            return "表現・慣用句"
-    for t in tags:
-        if t.startswith("adj"):
-            return "形容詞"
-    for t in tags:
-        if t.startswith("v") or t == "aux-v":
-            return "動詞"
-    for t in tags:
-        if t.startswith("adv"):
-            return "副詞"
-    for t in tags:
-        if t == "int":
-            return "感動詞"
-    for t in tags:
-        if t == "prt":
-            return "助詞"
-    for t in tags:
-        if t == "conj":
-            return "接続詞"
-    for t in tags:
-        if t == "pn":
-            return "代名詞"
-    for t in tags:
-        if t in ("pref", "n-pref"):
-            return "接頭辞"
-    for t in tags:
-        if t in ("suf", "n-suf"):
-            return "接尾辞"
-    for t in tags:
-        if t.startswith("n"):
-            return "名詞"
+    tagset = set(tags)
+    if "exp" in tagset:
+        return "表現・慣用句"
+    if any(t.startswith("adj") for t in tags):
+        return "形容詞"
+    # 活用パターンを持つ「本物の」動詞タグ(v1, v5系, vk, vz, vs-i/-s/-c, aux-v)がある場合のみ動詞と判定する。
+    # 「vs」(サ変動詞化できる、の意)や「vt」「vi」(他動詞/自動詞という推移性の注釈)は、
+    # 名詞・副詞にサ変動詞の用法が付随しているだけのケースが多く、それだけでは動詞と判定しない。
+    # 例:「あっさり」(adv, adv-to, vs) は副詞、「勉強」(n, vs, vt) は名詞であるべき。
+    true_verb_tags = [t for t in tags if any(t.startswith(p) for p in REAL_VERB_TAG_PREFIXES) or t == "aux-v"]
+    if true_verb_tags:
+        return "動詞"
+    if any(t.startswith("adv") for t in tags):
+        return "副詞"
+    if "int" in tagset:
+        return "感動詞"
+    if "prt" in tagset:
+        return "助詞"
+    if "conj" in tagset:
+        return "接続詞"
+    if "pn" in tagset:
+        return "代名詞"
+    if any(t in ("pref", "n-pref") for t in tags):
+        return "接頭辞"
+    if any(t in ("suf", "n-suf") for t in tags):
+        return "接尾辞"
+    if any(t.startswith("n") for t in tags):
+        return "名詞"
+    # 他に該当タグが無く「vs」のみの場合はサ変動詞として扱う
+    if "vs" in tagset:
+        return "動詞"
     return "その他"
 
 
