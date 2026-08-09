@@ -422,3 +422,149 @@
     if(e.key === "Escape") closeHashTool();
   });
 })();
+
+// ---------- 隠しコマンド: Ctrl+Alt+I でIPv4⇔IPv6変換ツールを開閉 ----------
+(function(){
+  document.addEventListener("keydown", (e) => {
+    const key = e.key.toLowerCase();
+    if(e.ctrlKey && e.altKey && key === "i"){
+      e.preventDefault();
+      toggleIpTool();
+    }
+  });
+
+  const TABS = { toV6: "IPv4 → IPv6", toV4: "IPv6 → IPv4" };
+  let currentTab = "toV6";
+
+  function openIpTool(){
+    renderIpTabs();
+    document.getElementById("ipOverlay").classList.add("active");
+    document.getElementById("ipValue").focus();
+    computeAndRenderIp();
+  }
+  function closeIpTool(){
+    document.getElementById("ipOverlay").classList.remove("active");
+  }
+  function toggleIpTool(){
+    const overlay = document.getElementById("ipOverlay");
+    if(overlay.classList.contains("active")) closeIpTool();
+    else openIpTool();
+  }
+
+  function renderIpTabs(){
+    const tabs = document.getElementById("ipTabs");
+    tabs.innerHTML = "";
+    Object.entries(TABS).forEach(([key, label]) => {
+      const btn = document.createElement("button");
+      btn.className = "unit-tab" + (key === currentTab ? " active" : "");
+      btn.textContent = label;
+      btn.onclick = () => {
+        currentTab = key;
+        document.getElementById("ipValue").value = "";
+        document.getElementById("ipValue").placeholder = key === "toV6" ? "例: 192.168.1.1" : "例: ::ffff:192.168.1.1";
+        renderIpTabs();
+        computeAndRenderIp();
+      };
+      tabs.appendChild(btn);
+    });
+  }
+
+  // ---------- IPv4 → IPv6 ----------
+  function parseIPv4(ip){
+    const m = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec((ip || "").trim());
+    if(!m) return null;
+    const parts = m.slice(1, 5).map(Number);
+    if(parts.some(p => p < 0 || p > 255)) return null;
+    return parts;
+  }
+  function hexGroup(a, b){
+    return ((a << 8) | b).toString(16); // 先頭ゼロは付けない(RFC 5952の正規表記に合わせる)
+  }
+  function ipv4ToRepresentations(parts){
+    const [a, b, c, d] = parts;
+    const dotted = `${a}.${b}.${c}.${d}`;
+    const hex1 = hexGroup(a, b);
+    const hex2 = hexGroup(c, d);
+    return [
+      { label: "IPv4-mapped(RFC 4291)", value: `::ffff:${dotted}` },
+      { label: "IPv4-mapped(16進表記)", value: `::ffff:${hex1}:${hex2}` },
+      { label: "IPv4-compatible(廃止)", value: `::${dotted}` },
+      { label: "6to4(RFC 3056)", value: `2002:${hex1}:${hex2}::` },
+      { label: "NAT64(RFC 6052)", value: `64:ff9b::${dotted}` },
+    ];
+  }
+
+  // ---------- IPv6 → IPv4 (既知のパターンから抽出) ----------
+  function ipv6ToIPv4(input){
+    const v = (input || "").trim().toLowerCase();
+    let m;
+    if((m = /^::ffff:(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$/.exec(v))){
+      return { label: "IPv4-mapped", value: m[1] };
+    }
+    if((m = /^::ffff:([0-9a-f]{1,4}):([0-9a-f]{1,4})$/.exec(v))){
+      return { label: "IPv4-mapped(16進表記)", value: hexPairToDotted(m[1], m[2]) };
+    }
+    if((m = /^64:ff9b::(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$/.exec(v))){
+      return { label: "NAT64", value: m[1] };
+    }
+    if((m = /^::(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$/.exec(v))){
+      return { label: "IPv4-compatible(廃止)", value: m[1] };
+    }
+    if((m = /^2002:([0-9a-f]{1,4}):([0-9a-f]{1,4}):{1,2}$/.exec(v))){
+      return { label: "6to4", value: hexPairToDotted(m[1], m[2]) };
+    }
+    return null;
+  }
+  function hexPairToDotted(h1, h2){
+    const n1 = parseInt(h1, 16), n2 = parseInt(h2, 16);
+    return [(n1 >> 8) & 0xff, n1 & 0xff, (n2 >> 8) & 0xff, n2 & 0xff].join(".");
+  }
+
+  function computeAndRenderIp(){
+    const raw = document.getElementById("ipValue").value;
+    const results = document.getElementById("ipResults");
+    const hint = document.getElementById("ipHint");
+    results.innerHTML = "";
+
+    if(raw.trim() === ""){
+      hint.textContent = currentTab === "toV6" ? "IPv4アドレスを入力してください(例: 192.168.1.1)" : "IPv6アドレスを入力してください";
+      return;
+    }
+
+    if(currentTab === "toV6"){
+      const parts = parseIPv4(raw);
+      if(!parts){
+        hint.textContent = "IPv4アドレスの形式が正しくありません";
+        return;
+      }
+      hint.textContent = "\u00a0";
+      ipv4ToRepresentations(parts).forEach(r => {
+        const row = document.createElement("div");
+        row.className = "unit-row";
+        row.innerHTML = `<span class="unit-name">${r.label}</span><span class="unit-value">${r.value}</span>`;
+        results.appendChild(row);
+      });
+    } else {
+      const found = ipv6ToIPv4(raw);
+      if(!found){
+        hint.textContent = "既知のIPv4埋め込み形式(mapped/compatible/6to4/NAT64)を検出できませんでした";
+        return;
+      }
+      hint.textContent = "\u00a0";
+      const row = document.createElement("div");
+      row.className = "unit-row origin";
+      row.innerHTML = `<span class="unit-name">${found.label}として検出</span><span class="unit-value">${found.value}</span>`;
+      results.appendChild(row);
+    }
+  }
+
+  document.getElementById("ipValue").addEventListener("input", computeAndRenderIp);
+  document.getElementById("ipClose").addEventListener("click", closeIpTool);
+  document.getElementById("ipOverlay").addEventListener("click", (e) => {
+    if(e.target.id === "ipOverlay") closeIpTool();
+  });
+  document.addEventListener("keydown", (e) => {
+    if(!document.getElementById("ipOverlay").classList.contains("active")) return;
+    if(e.key === "Escape") closeIpTool();
+  });
+})();
