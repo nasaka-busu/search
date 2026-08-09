@@ -242,24 +242,62 @@ function escapeHtml(str){
   }[ch]));
 }
 
-function highlightReading(entry){
-  const readingConds = conditions.filter(c => c.type === "reading" && c.matchType !== "length" && c.value);
+// entry.readingの中で、有効な各「読み」条件がどの位置にマッチしているかを
+// 条件の登録順ではなく文字列中の位置に基づいて求める。
+function getHighlightRanges(entry){
   const reading = entry.reading;
-  if(readingConds.length === 0) return escapeHtml(reading);
-  // 出現回数条件があれば、該当箇所を全てハイライト
-  const countCond = readingConds.find(c => c.matchType === "count" && reading.includes(c.value));
-  if(countCond){
-    return reading.split(countCond.value).map(escapeHtml).join("<mark>" + escapeHtml(countCond.value) + "</mark>");
-  }
-  for(const c of readingConds){
-    const idx = reading.indexOf(c.value);
-    if(idx !== -1){
-      return escapeHtml(reading.slice(0, idx))
-        + "<mark>" + escapeHtml(reading.slice(idx, idx + c.value.length)) + "</mark>"
-        + escapeHtml(reading.slice(idx + c.value.length));
+  const readingConds = conditions.filter(c => c.type === "reading" && c.matchType !== "length" && c.value);
+  const ranges = [];
+
+  readingConds.forEach(c => {
+    const v = c.value;
+    if(c.matchType === "starts"){
+      if(reading.startsWith(v)) ranges.push([0, v.length]);
+    } else if(c.matchType === "ends"){
+      if(reading.endsWith(v)) ranges.push([reading.length - v.length, reading.length]);
+    } else if(c.matchType === "contains" || c.matchType === "count"){
+      // 部分一致・出現回数条件は、該当する箇所をすべてハイライト対象にする
+      let pos = 0, idx;
+      while((idx = reading.indexOf(v, pos)) !== -1){
+        ranges.push([idx, idx + v.length]);
+        pos = idx + v.length;
+      }
+    }
+  });
+  return ranges;
+}
+
+// 複数条件のハイライト範囲が重なる・隣接する場合は1つにまとめる
+function mergeRanges(ranges){
+  if(ranges.length === 0) return [];
+  const sorted = ranges.slice().sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+  const merged = [sorted[0].slice()];
+  for(let i = 1; i < sorted.length; i++){
+    const last = merged[merged.length - 1];
+    const cur = sorted[i];
+    if(cur[0] <= last[1]){
+      last[1] = Math.max(last[1], cur[1]);
+    } else {
+      merged.push(cur.slice());
     }
   }
-  return escapeHtml(reading);
+  return merged;
+}
+
+function highlightReading(entry){
+  const reading = entry.reading;
+  const ranges = mergeRanges(getHighlightRanges(entry));
+  if(ranges.length === 0) return escapeHtml(reading);
+
+  let out = "";
+  let cursor = 0;
+  ranges.forEach(([start, end]) => {
+    out += escapeHtml(reading.slice(cursor, start));
+    out += "<mark>" + escapeHtml(reading.slice(start, end)) + "</mark>";
+    cursor = end;
+  });
+  out += escapeHtml(reading.slice(cursor));
+  return out;
 }
 
 const MAX_DISPLAY_RESULTS = 200;
