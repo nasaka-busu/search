@@ -329,3 +329,96 @@
     if(e.key === "Escape") closeUnitConverter();
   });
 })();
+
+// ---------- 隠しコマンド: Ctrl+Alt+H でハッシュ生成ツールを開閉 ----------
+(function(){
+  document.addEventListener("keydown", (e) => {
+    const key = e.key.toLowerCase();
+    if(e.ctrlKey && e.altKey && key === "h"){
+      e.preventDefault();
+      toggleHashTool();
+    }
+  });
+
+  const ALGOS = ["SHA-1", "SHA-256", "SHA-384", "SHA-512"];
+  let hashDebounce = null;
+
+  function openHashTool(){
+    document.getElementById("hashOverlay").classList.add("active");
+    document.getElementById("hashInput").focus();
+    computeAndRenderHashes();
+  }
+  function closeHashTool(){
+    document.getElementById("hashOverlay").classList.remove("active");
+  }
+  function toggleHashTool(){
+    const overlay = document.getElementById("hashOverlay");
+    if(overlay.classList.contains("active")) closeHashTool();
+    else openHashTool();
+  }
+
+  async function digestHex(algo, text){
+    const enc = new TextEncoder().encode(text);
+    const buf = await crypto.subtle.digest(algo, enc);
+    return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, "0")).join("");
+  }
+
+  async function computeAndRenderHashes(){
+    const text = document.getElementById("hashInput").value;
+    const list = document.getElementById("hashResults");
+
+    if(text === ""){
+      list.innerHTML = '<div class="hash-empty">文字列を入力するとハッシュ値が表示されます</div>';
+      return;
+    }
+
+    if(!(window.crypto && window.crypto.subtle)){
+      list.innerHTML = '<div class="hash-empty">この環境ではWeb Crypto APIが利用できません(HTTPS、またはlocalhost経由での表示が必要です)</div>';
+      return;
+    }
+
+    try{
+      const results = await Promise.all(ALGOS.map(algo => digestHex(algo, text)));
+      list.innerHTML = "";
+      ALGOS.forEach((algo, i) => {
+        const row = document.createElement("div");
+        row.className = "hash-row";
+        row.innerHTML = `
+          <div class="hash-row-head">
+            <span class="hash-algo">${algo}</span>
+            <button class="hash-copy" data-hash="${results[i]}">コピー</button>
+          </div>
+          <div class="hash-value">${results[i]}</div>
+        `;
+        list.appendChild(row);
+      });
+      list.querySelectorAll(".hash-copy").forEach(btn => {
+        btn.addEventListener("click", async () => {
+          try{
+            await navigator.clipboard.writeText(btn.dataset.hash);
+            btn.textContent = "コピー済";
+            btn.classList.add("copied");
+            setTimeout(() => { btn.textContent = "コピー"; btn.classList.remove("copied"); }, 1200);
+          }catch(err){
+            console.warn("クリップボードへのコピーに失敗しました:", err);
+          }
+        });
+      });
+    }catch(err){
+      list.innerHTML = '<div class="hash-empty">ハッシュの計算に失敗しました</div>';
+    }
+  }
+
+  document.getElementById("hashInput").addEventListener("input", () => {
+    clearTimeout(hashDebounce);
+    hashDebounce = setTimeout(computeAndRenderHashes, 120);
+  });
+  document.getElementById("hashClose").addEventListener("click", closeHashTool);
+  document.getElementById("hashOverlay").addEventListener("click", (e) => {
+    if(e.target.id === "hashOverlay") closeHashTool();
+  });
+  document.addEventListener("keydown", (e) => {
+    if(!document.getElementById("hashOverlay").classList.contains("active")) return;
+    if(e.key === "Escape") closeHashTool();
+  });
+})();
